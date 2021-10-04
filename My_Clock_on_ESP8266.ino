@@ -5,11 +5,14 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPUpdateServer.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 #include <FastLED.h>
 #include <FS.h>                               // Please read the instructions on http://arduino.esp8266.com/Arduino/versions/2.3.0/doc/filesystem.html#uploading-files-to-file-system
 #define countof(a) (sizeof(a) / sizeof(a[0]))
 #define NUM_LEDS 58                           // Total of 58 LED's     
-#define DATA_PIN D6                           // Change this if you are using another type of ESP board than a WeMos D1 Mini
+#define DATA_PIN D5                           // Change this if you are using another type of ESP board than a WeMos D1 Mini
+#define ONE_WIRE_BUS D6                       // Датчик температуры подключён к пину D6  
 #define MILLI_AMPS 2400 
 //!!!#define COUNTDOWN_OUTPUT D5
 
@@ -29,6 +32,8 @@
 // !!! RtcDS3231<TwoWire> Rtc(Wire);
 ESP8266WebServer server(80);
 ESP8266HTTPUpdateServer httpUpdateServer;
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
 WiFiUDP ntpUDP;
       // https://www.ntppool.org/zone/@ - other servers
       // for Russia - ru.pool.ntp.org                   
@@ -262,6 +267,7 @@ void setup() {
   //!!! digitalWrite(COUNTDOWN_OUTPUT, LOW);
 */  
   colorNum = random(16);
+  sensors.begin();
 }
 
 void loop(){
@@ -322,6 +328,9 @@ void updateClock() {
   int hour = timeClient.getHours();
   int mins = timeClient.getMinutes();
   int secs = timeClient.getSeconds();
+
+  if (hourFormat == 12 && hour > 12)
+    hour = hour - 12;
 
   byte h1 = hour / 10;
   byte h2 = hour % 10;
@@ -460,8 +469,14 @@ void updateTemperature() {
   byte t1 = int(ctemp) / 10;
   byte t2 = int(ctemp) % 10;
 !!!*/
-  byte t1 = 2; //!!!
-  byte t2 = 5; //!!!
+  sensors.requestTemperatures();       // Получаем температуру с датчика
+  float tempC = sensors.getTempCByIndex(0); 
+
+  if (temperatureSymbol == 13)
+    tempC = (tempC * 1.8000) + 32;
+
+  byte t1 = int(tempC) / 10;
+  byte t2 = int(tempC) % 10;
 
   CRGB color = CRGB(r_val, g_val, b_val);
   displayNumber(t1,3,color);
