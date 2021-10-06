@@ -1,7 +1,7 @@
-#include <Wire.h>
+//!!! #include <Wire.h>
 //!!! #include <RtcDS3231.h>                      // Include RTC library by Makuna: https://github.com/Makuna/Rtc
 #include <NTPClient.h>
-#include <WiFiUdp.h>
+//#include <WiFiUdp.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPUpdateServer.h>
@@ -9,14 +9,13 @@
 #include <DallasTemperature.h>
 #include <FastLED.h>
 #include <FS.h>                               // Please read the instructions on http://arduino.esp8266.com/Arduino/versions/2.3.0/doc/filesystem.html#uploading-files-to-file-system
-#define countof(a) (sizeof(a) / sizeof(a[0]))
-#define NUM_LEDS 58                           // Total of 58 LED's     
-#define DATA_PIN D5                           // Change this if you are using another type of ESP board than a WeMos D1 Mini
-#define ONE_WIRE_BUS D6                       // Датчик температуры подключён к пину D6  
-#define MILLI_AMPS 2400 
-//!!!#define COUNTDOWN_OUTPUT D5
 
-#define WIFIMODE 2                            // 0 = Only Soft Access Point, 1 = Only connect to local WiFi network with UN/PW, 2 = Both
+#define countof(a) (sizeof(a) / sizeof(a[0]))
+#define NUM_LEDS 58                           // Total of 58 LEDs     
+#define DATA_PIN D5                           // Data out on D5
+#define ONE_WIRE_BUS D6                       // Temp sonsor on D6  
+#define MILLI_AMPS 2400 
+#define WIFIMODE 1                            //!!!   0 = Only Soft Access Point, 1 = Only connect to local WiFi network with UN/PW, 2 = Both
 
 #if defined(WIFIMODE) && (WIFIMODE == 0 || WIFIMODE == 2)
   const char* APssid = "CLOCK_AP";        
@@ -29,15 +28,13 @@
   const char *password = PSW;
 #endif
 
-// !!! RtcDS3231<TwoWire> Rtc(Wire);
+//!!! RtcDS3231<TwoWire> Rtc(Wire);
 ESP8266WebServer server(80);
 ESP8266HTTPUpdateServer httpUpdateServer;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 WiFiUDP ntpUDP;
-      // https://www.ntppool.org/zone/@ - other servers
-      // for Russia - ru.pool.ntp.org                   
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 10800, 3600123);// 10800 - time shift in seconds from UTC
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 10800, 3600123);// 10800 - time shift in seconds from UTC // https://www.ntppool.org/zone/@ - other servers
 CRGB LEDs[NUM_LEDS];
 
 // Settings
@@ -50,8 +47,6 @@ bool autoChange = true;
 byte brightness = 130;
 byte colorNum = 0;
 CRGB color = CRGB::DarkOrchid;                // Default color
-//CRGB color = CRGB::MediumVioletRed;
-CRGB alternateColor = CRGB::Black; 
 float temperatureCorrection = -3.0;
 byte temperatureSymbol = 12;                  // 12=Celcius, 13=Fahrenheit check 'numbers'
 byte clockMode = 0;                           // Clock modes: 0=Clock, 1=Countdown, 2=Temperature, 3=Scoreboard
@@ -64,8 +59,7 @@ byte scoreboardRight = 0;
 CRGB scoreboardColorLeft = CRGB::Green;
 CRGB scoreboardColorRight = CRGB::Red;
 byte last_digit = 0;
-//Different colors
-long ColorTable[16] = {
+long ColorTable[16] = {                       // Random colors
   CRGB::Amethyst,
   CRGB::Aqua,
   CRGB::Blue,
@@ -101,17 +95,16 @@ long numbers[] = {
 };
 
 void setup() {
-  //!!! pinMode(COUNTDOWN_OUTPUT, OUTPUT);
   Serial.begin(115200); 
   delay(200);
 
-/*!!!  // RTC DS3231 Setup
+/*!!! // RTC DS3231 Setup
   Rtc.Begin();    
   RtcDateTime compiled = RtcDateTime(__DATE__, __TIME__);
 
   if (!Rtc.IsDateTimeValid()) {
-      if (Rtc.LastError() != 0) {
-          // we have a communications error see https://www.arduino.cc/en/Reference/WireEndTransmission for what the number means
+      if (Rtc.LastError() != 0) {  
+          // We have a communications error see https://www.arduino.cc/en/Reference/WireEndTransmission for what the number means
           Serial.print("RTC communications error = ");
           Serial.println(Rtc.LastError());
       } else {
@@ -124,14 +117,10 @@ void setup() {
           // having an issue
           Rtc.SetDateTime(compiled);
       }
-  }
-!!!*/
+  }!!!*/
 
   WiFi.setSleepMode(WIFI_NONE_SLEEP);  
-
   delay(200);
-  //Serial.setDebugOutput(true);
-
   FastLED.addLeds<WS2812B, DATA_PIN, GRB>(LEDs, NUM_LEDS);  
   FastLED.setDither(false);
   FastLED.setCorrection(TypicalLEDStrip);
@@ -158,17 +147,13 @@ void setup() {
       Serial.println("Could not connect to local WiFi.");      
       return;
     }
-       
     delay(500);
     Serial.print(".");
     timeClient.begin();
-    //LEDs[count] = CRGB::Green;
-    //FastLED.show();
     count++;
   }
   Serial.print("Local IP: ");
   Serial.println(WiFi.localIP());
-
   IPAddress ip = WiFi.localIP();
   Serial.println(ip[3]);
 #endif   
@@ -189,8 +174,6 @@ void setup() {
     // Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
     String datearg = server.arg("date");
     String timearg = server.arg("time");
-    Serial.println(datearg);
-    Serial.println(timearg);    
     char d[12];
     char t[9];
     datearg.toCharArray(d, 12);
@@ -211,7 +194,6 @@ void setup() {
     byte cd_r_val = server.arg("r").toInt();
     byte cd_g_val = server.arg("g").toInt();
     byte cd_b_val = server.arg("b").toInt();
-    //!!!digitalWrite(COUNTDOWN_OUTPUT, LOW);
     countdownColor = CRGB(cd_r_val, cd_g_val, cd_b_val); 
     endCountDownMillis = millis() + countdownMilliSeconds;
     allBlank(); 
@@ -254,18 +236,7 @@ void setup() {
 
   server.serveStatic("/", SPIFFS, "/", "max-age=86400");
   server.begin();     
-
   SPIFFS.begin();
-/*  Serial.println("SPIFFS contents:");
-  Dir dir = SPIFFS.openDir("/");
-  while (dir.next()) {
-    String fileName = dir.fileName();
-    size_t fileSize = dir.fileSize();
-    Serial.printf("FS File: %s, size: %s\n", fileName.c_str(), String(fileSize).c_str());
-  }
-  Serial.println(); 
-  //!!! digitalWrite(COUNTDOWN_OUTPUT, LOW);
-*/  
   colorNum = random(16);
   sensors.begin();
 }
@@ -311,7 +282,7 @@ void displayNumber(byte number, byte segment, CRGB color) {
 
   for (byte i=0; i<14; i++){
     yield();
-    LEDs[startindex + 13 - i] = ((numbers[number] & 1 << i) == 1 << i) ? color : alternateColor;
+    LEDs[startindex + 13 - i] = ((numbers[number] & 1 << i) == 1 << i) ? color : CRGB::Black;
   } 
 }
 
@@ -327,7 +298,7 @@ void updateClock() {
   
   int hour = timeClient.getHours();
   int mins = timeClient.getMinutes();
-  int secs = timeClient.getSeconds();
+  //int secs = timeClient.getSeconds();
 
   if (hourFormat == 12 && hour > 12)
     hour = hour - 12;
@@ -336,8 +307,8 @@ void updateClock() {
   byte h2 = hour % 10;
   byte m1 = mins / 10;
   byte m2 = mins % 10;  
-  byte s1 = secs / 10;
-  byte s2 = secs % 10;
+  //byte s1 = secs / 10;
+  //byte s2 = secs % 10;
 
   if ( autoChange ) {
      if (m2 != last_digit) {                    // Change color every minute
@@ -347,9 +318,8 @@ void updateClock() {
           }
           last_digit = m2;
       }
-  }else {
+  }else 
       color = CRGB(r_val, g_val, b_val);    
-  }
   
   if (h1 > 0)
     displayNumber(h1,3,color);
@@ -359,7 +329,6 @@ void updateClock() {
   displayNumber(h2,2,color);
   displayNumber(m1,1,color);
   displayNumber(m2,0,color); 
-
   displayDots(color);  
 }
 
@@ -374,19 +343,6 @@ void updateCountdown() {
   unsigned long seconds = restMillis / 1000;
   int remSeconds = seconds - (minutes * 60);
   int remMinutes = minutes - (hours * 60); 
-/*  
-  Serial.print(restMillis);
-  Serial.print(" ");
-  Serial.print(hours);
-  Serial.print(" ");
-  Serial.print(minutes);
-  Serial.print(" ");
-  Serial.print(seconds);
-  Serial.print(" | ");
-  Serial.print(remMinutes);
-  Serial.print(" ");
-  Serial.println(remSeconds);
-*/
   byte h1 = hours / 10;
   byte h2 = hours % 10;
   byte m1 = remMinutes / 10;
@@ -416,11 +372,8 @@ void updateCountdown() {
   displayDots(color);  
 
   if (hours <= 0 && remMinutes <= 0 && remSeconds <= 0) {
-    Serial.println("Countdown timer ended.");
-    //endCountdown();
     countdownMilliSeconds = 0;
     endCountDownMillis = 0;
-    //!!! digitalWrite(COUNTDOWN_OUTPUT, HIGH);
     return;
   }  
 }
@@ -441,10 +394,8 @@ void displayDots(CRGB color) {
   if (dotsOn) {
     LEDs[28] = color;
     LEDs[29] = color;
-  } else {
-    LEDs[28] = CRGB::Black;
-    LEDs[29] = CRGB::Black;
-  }
+  } else 
+      hideDots();
 
   dotsOn = !dotsOn;  
 }
@@ -456,20 +407,10 @@ void hideDots() {
 
 void updateTemperature() {
 /*!!!  RtcTemperature temp = Rtc.GetTemperature();
-  float ftemp = temp.AsFloatDegC();
-  float ctemp = ftemp + temperatureCorrection;
-  Serial.print("Sensor temp: ");
-  Serial.print(ftemp);
-  Serial.print(" Corrected: ");
-  Serial.println(ctemp);
-
-  if (temperatureSymbol == 13)
-    ctemp = (ctemp * 1.8000) + 32;
-
-  byte t1 = int(ctemp) / 10;
-  byte t2 = int(ctemp) % 10;
+  float ftemp = temp.AsFloatDegC();             // Sensor temp
+  float ctemp = ftemp + temperatureCorrection;  // Corrected temp
 !!!*/
-  sensors.requestTemperatures();       // Получаем температуру с датчика
+  sensors.requestTemperatures();                // Get temp from DS18B20
   float tempC = sensors.getTempCByIndex(0); 
 
   if (temperatureSymbol == 13)
