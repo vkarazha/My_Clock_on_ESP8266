@@ -1,19 +1,18 @@
 //!!! #include <Wire.h>
-//!!! #include <RtcDS3231.h>                      // Include RTC library by Makuna: https://github.com/Makuna/Rtc
+//!!! #include <RtcDS3231.h>                  // Include RTC library by Makuna: https://github.com/Makuna/Rtc
 #include <NTPClient.h>
-//#include <WiFiUdp.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPUpdateServer.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <FastLED.h>
-#include <FS.h>                               // Please read the instructions on http://arduino.esp8266.com/Arduino/versions/2.3.0/doc/filesystem.html#uploading-files-to-file-system
+#include <FS.h>                               // Instructions on http://arduino.esp8266.com/Arduino/versions/2.3.0/doc/filesystem.html#uploading-files-to-file-system
 
 #define countof(a) (sizeof(a) / sizeof(a[0]))
 #define NUM_LEDS 58                           // Total of 58 LEDs     
-#define DATA_PIN D5                           // Data out on D5
-#define ONE_WIRE_BUS D6                       // Temp sonsor on D6  
+#define DATA_PIN D5                           // Data output on D5
+#define ONE_WIRE_BUS D6                       // Temp sensor on D6  
 #define MILLI_AMPS 2400 
 #define WIFIMODE 1                            //!!!   0 = Only Soft Access Point, 1 = Only connect to local WiFi network with UN/PW, 2 = Both
 
@@ -23,7 +22,7 @@
 #endif
   
 #if defined(WIFIMODE) && (WIFIMODE == 1 || WIFIMODE == 2)
-  #include "Settings.h"                    // Create this file in the same directory as the .ino file and add your wifi settings (#define SID YOURSSID and on the second line #define PSW YOURPASSWORD)
+  #include "Settings.h"                       // Create this file in the same directory as the .ino file and add your wifi settings (#define SID YOURSSID and on the second line #define PSW YOURPASSWORD)
   const char *ssid = SID;
   const char *password = PSW;
 #endif
