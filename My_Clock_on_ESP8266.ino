@@ -33,32 +33,33 @@ ESP8266HTTPUpdateServer httpUpdateServer;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 10800, 3600123);// 10800 - time shift in seconds from UTC // https://www.ntppool.org/zone/@ - other servers
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 10800, 3600123); //GMT+3 : 3*3600=10800
 CRGB LEDs[NUM_LEDS];
 
 // Settings
 unsigned long prevTime = 0;
+unsigned long currentMillis;
+unsigned long countdownMillis;
+unsigned long endCountDownMillis;
 byte r_val = 255;
 byte g_val = 0;
 byte b_val = 0;
-bool dotsOn = true;
-bool autoChange = true;
 byte brightness = 130;
 byte colorNum = 0;
-CRGB color = CRGB::DarkOrchid;                // Default color
-float temperatureCorrection = -3.0;
 byte temperatureSymbol = 12;                  // 12=Celcius, 13=Fahrenheit check 'numbers'
 byte clockMode = 0;                           // Clock modes: 0=Clock, 1=Countdown, 2=Temperature, 3=Scoreboard
-unsigned long countdownMilliSeconds;
-unsigned long endCountDownMillis;
-byte hourFormat = 24;                         // Change this to 12 if you want default 12 hours format instead of 24               
-CRGB countdownColor = CRGB::Green;
+byte hourFormat = 24;                         // 12 or 24 hour format
 byte scoreboardLeft = 0;
 byte scoreboardRight = 0;
+byte lastDigit = 0;
+bool dotsOn = true;
+bool autoChange = true;
+float temperatureCorrection = -3.0;
+CRGB color = CRGB::DarkOrchid;                // Default color
+CRGB countdownColor = CRGB::Green;
 CRGB scoreboardColorLeft = CRGB::Green;
 CRGB scoreboardColorRight = CRGB::Red;
-byte last_digit = 0;
-long ColorTable[16] = {                       // Random colors
+long colorTable[16] = {                       // Colors for autoChange
   CRGB::Amethyst,
   CRGB::Aqua,
   CRGB::Blue,
@@ -77,21 +78,22 @@ long ColorTable[16] = {                       // Random colors
   CRGB::Orchid
 };
 long numbers[] = {
-  0b00111111111111,  // [0] 0
-  0b00110000000011,  // [1] 1
-  0b11111100111100,  // [2] 2
-  0b11111100001111,  // [3] 3
-  0b11110011000011,  // [4] 4
-  0b11001111001111,  // [5] 5
-  0b11001111111111,  // [6] 6
-  0b00111100000011,  // [7] 7
+  0b11111111111100,  // [0] 0
+  0b11000000001100,  // [1] 1
+  0b00111100111111,  // [2] 2
+  0b11110000111111,  // [3] 3
+  0b11000011001111,  // [4] 4
+  0b11110011110011,  // [5] 5
+  0b11111111110011,  // [6] 6
+  0b11000000111100,  // [7] 7
   0b11111111111111,  // [8] 8
-  0b11111111001111,  // [9] 9
+  0b11110011111111,  // [9] 9
   0b00000000000000,  // [10] off
-  0b11111111000000,  // [11] degrees symbol
-  0b00001111111100,  // [12] C(elsius)
-  0b11001111110000,  // [13] F(ahrenheit)
+  0b00000011111111,  // [11] degrees symbol
+  0b00111111110000,  // [12] C(elsius)
+  0b00001111110011   // [13] F(ahrenheit)
 };
+byte segmentStart[] = {44, 30, 14, 0};       // Start of each segment. Segment from left to right: 0, 1, 2, 3
 
 void setup() {
   Serial.begin(115200); 
@@ -125,6 +127,7 @@ void setup() {
   FastLED.setCorrection(TypicalLEDStrip);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, MILLI_AMPS);
   fill_solid(LEDs, NUM_LEDS, CRGB::Black);
+  FastLED.setBrightness(brightness);
   FastLED.show();
 
   // WiFi - AP Mode or both
@@ -150,7 +153,7 @@ void setup() {
     Serial.print(".");
     timeClient.begin();
     count++;
-  }
+  }\
   Serial.print("Local IP: ");
   Serial.println(WiFi.localIP());
   IPAddress ip = WiFi.localIP();
@@ -164,6 +167,7 @@ void setup() {
     r_val = server.arg("r").toInt();
     g_val = server.arg("g").toInt();
     b_val = server.arg("b").toInt();
+    color = CRGB(r_val, g_val, b_val);
     autoChange = false;
     server.send(200, "text/json", "{\"result\":\"ok\"}");
   });
@@ -185,16 +189,17 @@ void setup() {
 
   server.on("/brightness", HTTP_POST, []() {    
     brightness = server.arg("brightness").toInt();    
+    FastLED.setBrightness(brightness);
     server.send(200, "text/json", "{\"result\":\"ok\"}");
   });
   
   server.on("/countdown", HTTP_POST, []() {    
-    countdownMilliSeconds = server.arg("ms").toInt();     
+    countdownMillis = server.arg("ms").toInt();     
     byte cd_r_val = server.arg("r").toInt();
     byte cd_g_val = server.arg("g").toInt();
     byte cd_b_val = server.arg("b").toInt();
     countdownColor = CRGB(cd_r_val, cd_g_val, cd_b_val); 
-    endCountDownMillis = millis() + countdownMilliSeconds;
+    endCountDownMillis = millis() + countdownMillis;
     allBlank(); 
     clockMode = 1;     
     server.send(200, "text/json", "{\"result\":\"ok\"}");
@@ -228,7 +233,7 @@ void setup() {
   });  
 
   server.on("/auto", HTTP_POST, []() { 
-    last_digit = 55;      
+    lastDigit = 55;      
     autoChange = true;
     server.send(200, "text/json", "{\"result\":\"ok\"}");
   });  
@@ -243,7 +248,7 @@ void setup() {
 void loop(){
   server.handleClient(); 
   
-  unsigned long currentMillis = millis();  
+  currentMillis = millis();  
   if (currentMillis - prevTime >= 1000) {
     prevTime = currentMillis;
 
@@ -254,34 +259,18 @@ void loop(){
     } else if (clockMode == 2) {
       updateTemperature();      
     } else if (clockMode == 3) {
-      updateScoreboard();            
+      updateScoreboard();          
     }
 
-    FastLED.setBrightness(brightness);
+    //FastLED.setBrightness(brightness);
     FastLED.show();
   }   
 }
 
 void displayNumber(byte number, byte segment, CRGB color) {
-  byte startindex = 0;  // segment from left to right: 0, 1, 2, 3
-  switch (segment) {
-    case 3:
-      startindex = 0;
-      break;
-    case 2:
-      startindex = 14;
-      break;
-    case 1:
-      startindex = 30;
-      break;
-    case 0:
-      startindex = 44;
-      break;    
-  }
-
-  for (byte i=0; i<14; i++){
+  for (int i=0; i<14; i++){
     yield();
-    LEDs[startindex + 13 - i] = ((numbers[number] & 1 << i) == 1 << i) ? color : CRGB::Black;
+    LEDs[i + segmentStart[segment]] = ((numbers[number] & 1 << i) == 1 << i) ? color : CRGB::Black;
   } 
 }
 
@@ -309,22 +298,17 @@ void updateClock() {
   //byte s1 = secs / 10;
   //byte s2 = secs % 10;
 
-  if ( autoChange ) {
-     if (m2 != last_digit) {                    // Change color every minute
-          color = ColorTable[colorNum++];
-          if (colorNum >= 16) {
-              colorNum = 0;
-          }
-          last_digit = m2;
-      }
-  }else 
-      color = CRGB(r_val, g_val, b_val);    
+  if (autoChange && (m2 != lastDigit)) { // Change color every minute
+    color = colorTable[colorNum++];
+    lastDigit = m2;
+    if (colorNum >= 16) 
+      colorNum = 0;
+  }
   
-  if (h1 > 0)
-    displayNumber(h1,3,color);
-  else 
-    displayNumber(10,3,color);  // Blank
-    
+  if (h1 == 0)
+    h1 = 10;                             // Blank
+
+  displayNumber(h1,3,color);
   displayNumber(h2,2,color);
   displayNumber(m1,1,color);
   displayNumber(m2,0,color); 
@@ -332,8 +316,7 @@ void updateClock() {
 }
 
 void updateCountdown() {
-
-  if (countdownMilliSeconds == 0 && endCountDownMillis == 0) 
+  if (countdownMillis == 0 && endCountDownMillis == 0) 
     return;
     
   unsigned long restMillis = endCountDownMillis - millis();
@@ -354,14 +337,12 @@ void updateCountdown() {
     color = CRGB::Red;
   }
 
-  if (hours > 0) {
-    // hh:mm
+  if (hours > 0) {               // hh:mm
     displayNumber(h1,3,color); 
     displayNumber(h2,2,color);
     displayNumber(m1,1,color);
     displayNumber(m2,0,color);  
-  } else {
-    // mm:ss   
+  } else {                       // mm:ss   
     displayNumber(m1,3,color);
     displayNumber(m2,2,color);
     displayNumber(s1,1,color);
@@ -371,7 +352,7 @@ void updateCountdown() {
   displayDots(color);  
 
   if (hours <= 0 && remMinutes <= 0 && remSeconds <= 0) {
-    countdownMilliSeconds = 0;
+    countdownMillis = 0;
     endCountDownMillis = 0;
     return;
   }  
@@ -413,7 +394,7 @@ void updateTemperature() {
   float tempC = sensors.getTempCByIndex(0); 
 
   if (temperatureSymbol == 13)
-    tempC = (tempC * 1.8000) + 32;
+    tempC = tempC * 1.8 + 32;
 
   byte t1 = int(tempC) / 10;
   byte t2 = int(tempC) % 10;
