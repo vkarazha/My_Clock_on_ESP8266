@@ -1,13 +1,13 @@
 //!!! #include <Wire.h>
 //!!! #include <RtcDS3231.h>                  // Include RTC library by Makuna: https://github.com/Makuna/Rtc
+//#include <OneWire.h>
+//#include <FS.h>                             // Instructions on http://arduino.esp8266.com/Arduino/versions/2.3.0/doc/filesystem.html#uploading-files-to-file-system
+//#include <ESP8266WiFi.h>
+//#include <ESP8266WebServer.h>
 #include <NTPClient.h>
-#include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
 #include <ESP8266HTTPUpdateServer.h>
-#include <OneWire.h>
 #include <DallasTemperature.h>
 #include <FastLED.h>
-#include <FS.h>                               // Instructions on http://arduino.esp8266.com/Arduino/versions/2.3.0/doc/filesystem.html#uploading-files-to-file-system
 
 #define countof(a) (sizeof(a) / sizeof(a[0]))
 #define NUM_LEDS 58                           // Total of 58 LEDs     
@@ -15,6 +15,8 @@
 #define ONE_WIRE_BUS D6                       // Temp sensor on D6  
 #define MILLI_AMPS 2400 
 #define WIFIMODE 1                            //!!!   0 = Only Soft Access Point, 1 = Only connect to local WiFi network with UN/PW, 2 = Both
+#define DOT1 28 
+#define DOT2 29 
 
 #if defined(WIFIMODE) && (WIFIMODE == 0 || WIFIMODE == 2)
   const char* APssid = "CLOCK_AP";        
@@ -22,7 +24,7 @@
 #endif
   
 #if defined(WIFIMODE) && (WIFIMODE == 1 || WIFIMODE == 2)
-  #include "Settings.h"                       // Create this file in the same directory as the .ino file and add your wifi settings (#define SID YOURSSID and on the second line #define PSW YOURPASSWORD)
+  #include "Settings.h"                       // Create this file in the same directory as the .ino file and add your wifi settings (#define SID "your_ssid" and on the second line #define PSW "your_password")
   const char *ssid = SID;
   const char *password = PSW;
 #endif
@@ -33,51 +35,51 @@ ESP8266HTTPUpdateServer httpUpdateServer;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 10800, 3600123); //GMT+3 : 3*3600=10800
-CRGB LEDs[NUM_LEDS];
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 10800, 3600123);   // GMT+3 :   3 * 3600 = 10800
 
 // Settings
-unsigned long prevTime = 0;
-unsigned long currentMillis;
-unsigned long countdownMillis;
-unsigned long endCountDownMillis;
-byte r_val = 255;
-byte g_val = 0;
-byte b_val = 0;
-byte brightness = 130;
-byte colorNum = 0;
-byte temperatureSymbol = 12;                  // 12=Celcius, 13=Fahrenheit check 'numbers'
-byte clockMode = 0;                           // Clock modes: 0=Clock, 1=Countdown, 2=Temperature, 3=Scoreboard
-byte hourFormat = 24;                         // 12 or 24 hour format
-byte scoreboardLeft = 0;
-byte scoreboardRight = 0;
-byte lastDigit = 0;
+uint32_t prevTime = 0;
+uint32_t currentMillis;
+uint32_t countdownMillis;
+uint32_t endCountDownMillis;
+//uint8_t r_val = 255;
+//uint8_t g_val = 0;
+//uint8_t b_val = 0;
+uint8_t brightness = 120;
+uint8_t colorNum = 1;
+uint8_t tempSymbol = 12;                      // 12=Celcius, 13=Fahrenheit check 'numbers'
+uint8_t clockMode = 0;                        // Clock modes: 0=Clock, 1=Countdown, 2=Temperature, 3=Scoreboard
+uint8_t hourFormat = 24;                      // 12 or 24 hour format
+uint8_t scoreboardLeft = 0;
+uint8_t scoreboardRight = 0;
+uint8_t lastDigit = 0;
 bool dotsOn = true;
 bool autoChange = true;
 float temperatureCorrection = -3.0;
-CRGB color = CRGB::DarkOrchid;                // Default color
+CRGB LEDs[NUM_LEDS];
+CRGB color = CRGB::Aqua;                      // Default color
 CRGB countdownColor = CRGB::Green;
 CRGB scoreboardColorLeft = CRGB::Green;
 CRGB scoreboardColorRight = CRGB::Red;
-long colorTable[16] = {                       // Colors for autoChange
+CRGB colorTable[] = {                         // Colors for autoChange
   CRGB::Amethyst,
   CRGB::Aqua,
+  CRGB::Yellow,
   CRGB::Blue,
   CRGB::Chartreuse,
-  CRGB::DarkGreen,
-  CRGB::DarkMagenta,
+  CRGB::LightCoral,
+  CRGB::Green,
+  CRGB::Tomato,
   CRGB::DarkOrange,
   CRGB::DeepPink,
-  CRGB::Fuchsia,
   CRGB::Gold,
+  CRGB::Magenta,
   CRGB::GreenYellow,
-  CRGB::LightCoral,
-  CRGB::Tomato,
   CRGB::Salmon,
   CRGB::Red,
   CRGB::Orchid
 };
-long numbers[] = {
+uint16_t numbers[] = {
   0b11111111111100,  // [0] 0
   0b11000000001100,  // [1] 1
   0b00111100111111,  // [2] 2
@@ -93,7 +95,7 @@ long numbers[] = {
   0b00111111110000,  // [12] C(elsius)
   0b00001111110011   // [13] F(ahrenheit)
 };
-byte segmentStart[] = {44, 30, 14, 0};       // Start of each segment. Segment from left to right: 0, 1, 2, 3
+uint8_t segmentStart[] = { 44, 30, 14, 0 };   // Start of each segment. Segment from left to right: 0, 1, 2, 3  
 
 void setup() {
   Serial.begin(115200); 
@@ -106,13 +108,13 @@ void setup() {
   if (!Rtc.IsDateTimeValid()) {
       if (Rtc.LastError() != 0) {  
           // We have a communications error see https://www.arduino.cc/en/Reference/WireEndTransmission for what the number means
-          Serial.print("RTC communications error = ");
+          Serial.print(F("RTC communications error = "));
           Serial.println(Rtc.LastError());
       } else {
           // Common Causes:
           //    1) first time you ran and the device wasn't running yet
           //    2) the battery on the device is low or even missing
-          Serial.println("RTC lost confidence in the DateTime!");
+          Serial.println(F("RTC lost confidence in the DateTime!"));
           // following line sets the RTC to the date & time this sketch was compiled
           // it will also reset the valid flag internally unless the Rtc device is
           // having an issue
@@ -133,28 +135,28 @@ void setup() {
   // WiFi - AP Mode or both
 #if defined(WIFIMODE) && (WIFIMODE == 0 || WIFIMODE == 2) 
   WiFi.mode(WIFI_AP_STA);
-  WiFi.softAP(APssid, APpassword);    // IP is usually 192.168.4.1
+  WiFi.softAP(APssid, APpassword);            // IP is usually 192.168.4.1
   Serial.println();
-  Serial.print("SoftAP IP: ");
+  Serial.print(F("SoftAP IP: "));
   Serial.println(WiFi.softAPIP());
 #endif
 
   // WiFi - Local network Mode or both
 #if defined(WIFIMODE) && (WIFIMODE == 1 || WIFIMODE == 2) 
-  byte count = 0;
+  uint8_t count = 0;
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     // Stop if cannot connect
     if (count >= 60) {
-      Serial.println("Could not connect to local WiFi.");      
+      Serial.println(F("Could not connect to local WiFi."));      
       return;
     }
     delay(500);
-    Serial.print(".");
+    Serial.print(F("."));
     timeClient.begin();
     count++;
-  }\
-  Serial.print("Local IP: ");
+  }
+  Serial.print(F("Local IP: "));
   Serial.println(WiFi.localIP());
   IPAddress ip = WiFi.localIP();
   Serial.println(ip[3]);
@@ -164,9 +166,9 @@ void setup() {
 
   // Handlers
   server.on("/color", HTTP_POST, []() {    
-    r_val = server.arg("r").toInt();
-    g_val = server.arg("g").toInt();
-    b_val = server.arg("b").toInt();
+    uint8_t r_val = server.arg("r").toInt();
+    uint8_t g_val = server.arg("g").toInt();
+    uint8_t b_val = server.arg("b").toInt();
     color = CRGB(r_val, g_val, b_val);
     autoChange = false;
     server.send(200, "text/json", "{\"result\":\"ok\"}");
@@ -175,14 +177,15 @@ void setup() {
   server.on("/setdate", HTTP_POST, []() { 
     // Sample input: date = "Dec 06 2009", time = "12:34:56"
     // Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
-    String datearg = server.arg("date");
+/*!!!    String datearg = server.arg("date");
     String timearg = server.arg("time");
     char d[12];
     char t[9];
     datearg.toCharArray(d, 12);
     timearg.toCharArray(t, 9);
-//!!!    RtcDateTime compiled = RtcDateTime(d, t);
-//!!!    Rtc.SetDateTime(compiled);   
+    RtcDateTime compiled = RtcDateTime(d, t);
+    Rtc.SetDateTime(compiled);   
+!!!*/
     clockMode = 0;     
     server.send(200, "text/json", "{\"result\":\"ok\"}");
   });
@@ -195,9 +198,9 @@ void setup() {
   
   server.on("/countdown", HTTP_POST, []() {    
     countdownMillis = server.arg("ms").toInt();     
-    byte cd_r_val = server.arg("r").toInt();
-    byte cd_g_val = server.arg("g").toInt();
-    byte cd_b_val = server.arg("b").toInt();
+    uint8_t cd_r_val = server.arg("r").toInt();
+    uint8_t cd_g_val = server.arg("g").toInt();
+    uint8_t cd_b_val = server.arg("b").toInt();
     countdownColor = CRGB(cd_r_val, cd_g_val, cd_b_val); 
     endCountDownMillis = millis() + countdownMillis;
     allBlank(); 
@@ -207,7 +210,7 @@ void setup() {
 
   server.on("/temperature", HTTP_POST, []() {   
     temperatureCorrection = server.arg("correction").toInt();
-    temperatureSymbol = server.arg("symbol").toInt();
+    tempSymbol = server.arg("symbol").toInt();
     clockMode = 2;     
     server.send(200, "text/json", "{\"result\":\"ok\"}");
   });  
@@ -241,8 +244,8 @@ void setup() {
   server.serveStatic("/", SPIFFS, "/", "max-age=86400");
   server.begin();     
   SPIFFS.begin();
-  colorNum = random(16);
   sensors.begin();
+  colorNum = random(16);
 }
 
 void loop(){
@@ -262,20 +265,19 @@ void loop(){
       updateScoreboard();          
     }
 
-    //FastLED.setBrightness(brightness);
     FastLED.show();
   }   
 }
 
-void displayNumber(byte number, byte segment, CRGB color) {
-  for (int i=0; i<14; i++){
+void displayNumber(uint8_t number, uint8_t segment, CRGB color) {
+  for (uint8_t i=0; i<14; i++){
     yield();
     LEDs[i + segmentStart[segment]] = ((numbers[number] & 1 << i) == 1 << i) ? color : CRGB::Black;
   } 
 }
 
 void allBlank() {
-  for (int i=0; i<NUM_LEDS; i++) {
+  for (uint8_t i=0; i<NUM_LEDS; i++) {
     LEDs[i] = CRGB::Black;
   }
   FastLED.show();
@@ -291,22 +293,22 @@ void updateClock() {
   if (hourFormat == 12 && hour > 12)
     hour = hour - 12;
 
-  byte h1 = hour / 10;
-  byte h2 = hour % 10;
-  byte m1 = mins / 10;
-  byte m2 = mins % 10;  
-  //byte s1 = secs / 10;
-  //byte s2 = secs % 10;
+  uint8_t h1 = hour / 10;
+  uint8_t h2 = hour % 10;
+  uint8_t m1 = mins / 10;
+  uint8_t m2 = mins % 10;  
+  //uint8_t s1 = secs / 10;
+  //uint8_t s2 = secs % 10;
 
-  if (autoChange && (m2 != lastDigit)) { // Change color every minute
+  if (autoChange && (m2 != lastDigit)) {      // Change color every minute
     color = colorTable[colorNum++];
-    lastDigit = m2;
-    if (colorNum >= 16) 
+    if (colorNum == sizeof(colorTable)) 
       colorNum = 0;
+    lastDigit = m2;
   }
   
   if (h1 == 0)
-    h1 = 10;                             // Blank
+    h1 = 10;                                  // Blank
 
   displayNumber(h1,3,color);
   displayNumber(h2,2,color);
@@ -319,30 +321,30 @@ void updateCountdown() {
   if (countdownMillis == 0 && endCountDownMillis == 0) 
     return;
     
-  unsigned long restMillis = endCountDownMillis - millis();
-  unsigned long hours   = ((restMillis / 1000) / 60) / 60;
-  unsigned long minutes = (restMillis / 1000) / 60;
-  unsigned long seconds = restMillis / 1000;
-  int remSeconds = seconds - (minutes * 60);
-  int remMinutes = minutes - (hours * 60); 
-  byte h1 = hours / 10;
-  byte h2 = hours % 10;
-  byte m1 = remMinutes / 10;
-  byte m2 = remMinutes % 10;  
-  byte s1 = remSeconds / 10;
-  byte s2 = remSeconds % 10;
+  uint32_t restMillis = endCountDownMillis - millis();
+  uint32_t hours   = ((restMillis / 1000) / 60) / 60;
+  uint32_t minutes = (restMillis / 1000) / 60;
+  uint32_t seconds = restMillis / 1000;
+  uint8_t remSeconds = seconds - (minutes * 60);
+  uint8_t remMinutes = minutes - (hours * 60); 
+  uint8_t h1 = hours / 10;
+  uint8_t h2 = hours % 10;
+  uint8_t m1 = remMinutes / 10;
+  uint8_t m2 = remMinutes % 10;  
+  uint8_t s1 = remSeconds / 10;
+  uint8_t s2 = remSeconds % 10;
 
   CRGB color = countdownColor;
   if (restMillis <= 60000) {
     color = CRGB::Red;
   }
 
-  if (hours > 0) {               // hh:mm
+  if (hours > 0) {                       // hh:mm
     displayNumber(h1,3,color); 
     displayNumber(h2,2,color);
     displayNumber(m1,1,color);
     displayNumber(m2,0,color);  
-  } else {                       // mm:ss   
+  } else {                               // mm:ss   
     displayNumber(m1,3,color);
     displayNumber(m2,2,color);
     displayNumber(s1,1,color);
@@ -360,7 +362,7 @@ void updateCountdown() {
 
 void endCountdown() {
   allBlank();
-  for (int i=0; i<NUM_LEDS; i++) {
+  for (uint8_t i=0; i<NUM_LEDS; i++) {
     if (i>0)
       LEDs[i-1] = CRGB::Black;
     
@@ -371,18 +373,15 @@ void endCountdown() {
 }
 
 void displayDots(CRGB color) {
-  if (dotsOn) {
-    LEDs[28] = color;
-    LEDs[29] = color;
-  } else 
-      hideDots();
-
+  if (dotsOn) 
+    LEDs[DOT1] = LEDs[DOT2] = color;
+  else
+    LEDs[DOT1] = LEDs[DOT2] = CRGB::Black;
   dotsOn = !dotsOn;  
 }
-
+ 
 void hideDots() {
-  LEDs[28] = CRGB::Black;
-  LEDs[29] = CRGB::Black;
+  LEDs[DOT1] = LEDs[DOT2] = CRGB::Black;
 }
 
 void updateTemperature() {
@@ -393,25 +392,25 @@ void updateTemperature() {
   sensors.requestTemperatures();                // Get temp from DS18B20
   float tempC = sensors.getTempCByIndex(0); 
 
-  if (temperatureSymbol == 13)
+  if (tempSymbol == 13)
     tempC = tempC * 1.8 + 32;
 
-  byte t1 = int(tempC) / 10;
-  byte t2 = int(tempC) % 10;
+  uint8_t t1 = uint8_t(tempC) / 10;
+  uint8_t t2 = uint8_t(tempC) % 10;
 
-  CRGB color = CRGB(r_val, g_val, b_val);
+  //CRGB color = CRGB(r_val, g_val, b_val);
   displayNumber(t1,3,color);
   displayNumber(t2,2,color);
   displayNumber(11,1,color);
-  displayNumber(temperatureSymbol,0,color);
+  displayNumber(tempSymbol,0,color);
   hideDots();
 }
 
 void updateScoreboard() {
-  byte sl1 = scoreboardLeft / 10;
-  byte sl2 = scoreboardLeft % 10;
-  byte sr1 = scoreboardRight / 10;
-  byte sr2 = scoreboardRight % 10;
+  uint8_t sl1 = scoreboardLeft / 10;
+  uint8_t sl2 = scoreboardLeft % 10;
+  uint8_t sr1 = scoreboardRight / 10;
+  uint8_t sr2 = scoreboardRight % 10;
 
   displayNumber(sl1,3,scoreboardColorLeft);
   displayNumber(sl2,2,scoreboardColorLeft);
