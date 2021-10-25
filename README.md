@@ -2,20 +2,15 @@
 
 This is the source and schema for homemade digital clock I've made.
 
-
-
 ![alt text](https://github.com/vkarazha/My_Clock_on_ESP8266/blob/master/Schema.png)
 
-| Components                              			    |
-| -------------                          			      |
-| Arduino Nano                           			      |
-| LED strip WS2812B 1 meter 30 RGB LED's		 	      |
-| Real time clock: DS3231 and battery          		  |
-| Bluetooth module: HC-05                 			    |
-| Temperature and Humidity Sensor: DHT11 or DHT22  	|
+| Components                                 |
+| -------------                          	   |
+| Wemos D1 mini                              |
+| LED strip WS2812B 1 meter 60 RGB LED's		   |
+| Temperature Sensor: DS18b20               	|
 | 5V / 2A  Power Supply								              |
-| PCB                                    			      |
-| Wires, Glue and a lot of patience :)    			    |
+| Wires, Glue and a lot of patience :)       |
  
 ### Important
 
