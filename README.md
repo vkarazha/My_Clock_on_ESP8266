@@ -1,6 +1,6 @@
 # My_Clock_on_ESP8266
 
-This is the source and schema for homemade digital clock I've made. Clock always showing exact time from internet NTP server. 
+This is the source and schema for homemade digital clock I've made. It always shows the exact time from internet NTP server. 
 
 ![alt text](https://github.com/vkarazha/My_Clock_on_ESP8266/blob/master/Schema.png)
 
