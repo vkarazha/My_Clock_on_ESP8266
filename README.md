@@ -4,6 +4,8 @@ This is the source and schema for homemade digital clock I've made.
 
 ![alt text](https://github.com/vkarazha/My_Clock_on_ESP8266/blob/master/Schema.png)
 
+![alt text](https://github.com/vkarazha/My_Clock_on_ESP8266/blob/master/LEDs.png)
+
 | Components                                 |
 | -------------                          	   |
 | Wemos D1 mini                              |
