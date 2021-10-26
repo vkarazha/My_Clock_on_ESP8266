@@ -9,7 +9,7 @@ This is the source and schema for homemade digital clock I've made. It always sh
 | Components                                 |
 | -------------                          	   |
 | Wemos D1 mini                              |
-| LED strip WS2812B 1 meter 58 RGB LED's		   |
+| LED strip WS2812B 1 meter 60 RGB LED's		   |
 | Temperature Sensor: DS18b20               	|
 | 5V / 2A  Power Supply								              |
 | Wires, Glue and a lot of patience :)       |
