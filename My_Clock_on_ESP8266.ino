@@ -35,7 +35,7 @@ ESP8266HTTPUpdateServer httpUpdateServer;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 10800, 3600123);   // GMT+3 :   3 * 3600 = 10800
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 10800, 3600123);   // GMT + 2 :   2 * 3600 = 7200
 
 // Settings
 bool dotsOn = true;
@@ -297,8 +297,9 @@ void updateClock() {
     //uint8_t s2 = secs % 10;
   
     if (autoChange && m2 != lastDigit) {      // Change color every minute
-        color = colorTable[colorNum++];
-        if (colorNum == sizeof(colorTable)) 
+        color = colorTable[colorNum];
+        colorNum++;
+        if (colorNum >= 16) 
             colorNum = 0;
         lastDigit = m2;
     }
